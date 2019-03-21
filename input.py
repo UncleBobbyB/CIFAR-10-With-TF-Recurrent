@@ -95,7 +95,46 @@ def distorted_inputs(data_dir, batch_size):
     filename_queue = tf.train.string_input_prodecer(filenames)
     
     with tf.name_scope('data_augmentation'):
-        
+        # Read examples from files in the filename queue.
+        read_input = read_cifar10(filename_queue)
+        reshaped_image = tf.cast(read_input.uint8image, tf.float32)
+
+        height = IMAGE_SIZE
+        width = IMAGE_SIZE
+
+        # Image processing for training the network.
+
+        # Randomly croppign a [height, width] section of the image.
+        distorted_image = tf.random_crop(reshaped_image, [height, width, 3])
+
+        # Randomly flipping the image horizontally.
+        distorted_image = tf.image.random_flip_left_right(distorted_image)
+
+        # Adjusting brightness
+        distorted_image = tf.image.random_brightness(distorted_image, max_delta=63)
+    
+        # For contrast
+        distorted_image = tf.image.random_constrast(distorted_image, lower=0.2, upper=1.8)
+
+        # Suntracting off the mean and divide by the variance of pixels
+        float_image = tf.image.per_image_standardization(distorted_image)
+
+        # Setting the shape of tensors
+        float_image.set_shape([height, width, 3])
+        read_input.label.set_shape(1)
+
+        # Ensure that random shuffling has good mixing properties
+        min_fraction_of_examples_in_queu = 0.4
+        min_queue_examples = int(NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN * min_fraction_of_examples_in_queu)
+
+        print('Filling queue with %d CIFAR images before starting to train.' % min_queue_examples)
+
+    # Generate a batch of images and labels by building up a queue of examples
+    return _generate_image_and_label_batch(float_image, read_input.label, min_queue_examples, batch_size, shuffle=True)
+
+def inputs(eval_data, data_dir, batch_size):
+    pass
+
 
 
 
