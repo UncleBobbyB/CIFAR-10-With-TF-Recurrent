@@ -242,7 +242,7 @@ def _add_loss_summaries(total_loss):
         total_loss: Total loss from loss().
 
     Returns:
-        loss_average_op: Op for generating moving averages of losses.
+        loss_averages_op: Op for generating moving averages of losses.
     """
     # Compute the moving average of all individual losses and the total loss.
     loss_averages = tf.train.ExponentialMovingAverage(0.9, name='avg')
@@ -256,7 +256,7 @@ def _add_loss_summaries(total_loss):
         tf.summary.scalar(l.op.name + ' (raw)', l)
         tf.summary.scalar(l.op.name, loss_averages.average(l))
 
-    return loss_average_op
+    return loss_averages_op
 
 
 
