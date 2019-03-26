@@ -259,6 +259,56 @@ def _add_loss_summaries(total_loss):
     return loss_averages_op
 
 
+def train(total_loss, global_step):
+    """
+    Train CIFAR-10 model.
+
+    Create an optimizer and apply to all trainable variabels. Add moving average for all trainable variables.
+
+    Parameters:
+        total_loss: Total loss from loss().
+        global_step: Integer Variable countign the numebr of training steps processed.
+
+    Returns:
+        train_op: Op for training.
+    """
+    # Variables that affect learning rate.
+    num_batches_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN / FLAGS.batch_size
+    decay_step = int(num_batches_per_epoch * NUM_EPOCHS_PER_DECAY)
+
+    # Decay the learning rate exponentially based on the number of steps.
+    lr = tf.train.exponential_decay(INITIAL_LEARNING_RATE, global_step, decay_steps, LEARNING_RATE_DECAY_FACTOR, staircase=True)
+    tf.summary.scalar('learning_rate', lr)
+
+    loss_average_op = _add_loss_summaries(total_loss)
+
+    # Compute gradients.
+    with tf.control_dependencies([loss_averates_op]):
+        opt = tf.train.GradientDescentOptimizer(lr)
+        grads = opt.comute_gradients(total_loss)
+
+    # Apply gradients.
+    apply_gradient_op = opt.apply_gradients(grads, gloabl_step=global_step)
+
+    # Add histograms for trainable variables.
+    for var in tf.trainable_variables():
+        tf.summary.histogram(var.op.name, var)
+
+    # Add histograms for gradients.
+    for grad, var in grads:
+        if grad is not None:
+            tf.summary.histogram(var.op.name + '/gradients', grad)
+
+    # Track the movign averages of all trainable variables.
+    variable+averages = tf.train.ExmponentialMovingAverage(MOVING_AVERAGE_DECAY, global_step)
+    with tf.control_dependencies([apply_gradient_op]):
+        variable_averages_op = variable_averages.apply(tf.trainable_variables())
+
+    return variable_averages_op
+
+
+
+
 
 
 
