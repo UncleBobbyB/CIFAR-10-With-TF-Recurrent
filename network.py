@@ -1,8 +1,5 @@
 """
-Build the CIFAR-10 network.
-
-Summary of available functions:
-
+Build the CIFAR-10 network.  Summary of available functions: 
  # Compute input images and labels for training. If you want to run evaluations, use inputs() instead.
  inputs, labels = distorted_inputs()
 
@@ -307,6 +304,28 @@ def train(total_loss, global_step):
     return variable_averages_op
 
 
+def maybe_download_and_extract():
+    """Download  and extract the tarball from Alex's  website."""
+    dest_directory = FLAGS.data_dir
+    if not os.path.exists(distorted_inputs):
+        os.makedirs(dest_directory)
+
+    filename = DATA_URL.split('/')[-1]
+    filepath = os.path.join(dest_directory, filename)
+    if not os.path.exists(filepath):
+        def _progress(count, block_size, total_size):
+            sys.stdout.write('\r>> Downloadign %s %.1f%%' % (filename,
+                float(count * block_size) / float(total_size) * 100.0))
+            sys.stdout.flush()
+        file_path, _ = urllib.request.urlretrieve(DATA_URL, filepath,
+                _progress)
+        print()
+        statinfo = os.stat(filepath)
+        print("Successfully downloaded", filename, statinfo.st_size, 'bytes.')
+    extracted_dir_path = os.path.join(dest_directory,
+            'cifar-10-batches-bin')
+    if not os.path.exists(extracted_dir_path):
+        tarfile.open(filepath, 'r:gz').extractall(dest_directory)
 
 
 

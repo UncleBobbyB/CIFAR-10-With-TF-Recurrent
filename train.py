@@ -51,18 +51,28 @@ def train():
                     sec_per_batch = float(duration / FLAGS.log_frequency)
 
                     format_str = ("%s: step %d, loss = %.2f (%.1f exmples/sec: %.3f sec/batch")
-                    print(format_str % (datetime.now(), self._step, loss_value, examples_per_sec, sec_per_batch)
+                    print(format_str % (datetime.now(), self._step, loss_value,
+                        examples_per_sec, sec_per_batch))
+
+        with tf.train.MonitoredTrainingSession(checkpoint_dir=FLAGS.train_dir,
+            hooks=[tf.trainStopAtStepHook(last_stop=FLAGS.max_steps),
+                tr.train.NanTensorHook(loss), _LoggerHook()],
+            config=tf.ConfigProto(log_device_placement=FLAGS.log_device_placement)) as mon_sess:
+            while not mon_sess.should_stop():
+                mon_sess.run(train_op)
 
 
 
+def main(argv=None):  # pylint disbale=unused-argument
+    network.maybe_download_and_extract()
+    if tf.gile.Exists(FLAGS.train_dir):
+        tf.gfile.DeleteRecursively(FLAGS.train_dir)
+    tf.gfile.MakeDirs(FLAGS.train_dir)
+    train()
 
 
-
-
-
-
-
-
+if __name__ == '__main__':
+    tf.app.run()
 
 
 
