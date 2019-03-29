@@ -1,10 +1,11 @@
 from datetime import datetime
+import os
 import time
 import tensorflow as tf
 import network
 
 FLAGS = tf.app.flags.FLAGS
-tf.app.flags.DEFIEN_string('train_dir', '/train_log', """Directory where to write event logs and checkpoint.""")
+tf.app.flags.DEFINE_string('train_dir', './train_log', """Directory where to write event logs and checkpoint.""")
 tf.app.flags.DEFINE_integer('max_steps', 100000, """Number of batches to run.""")
 tf.app.flags.DEFINE_boolean('log_device_placement', False, """Wether to log device placement.""")
 tf.app.flags.DEFINE_integer('log_frequency', 10, """How often to log results to the console""")
@@ -22,6 +23,9 @@ def train():
 
         # Build a Graph that computes the logits predictions from the inference model.
         logits = network.inference(images)
+        # print(logits.get_shape())
+        # print(labels.get_shape())
+        # os.system('pause')
 
         # Calcute loss.
         loss = network.loss(logits, labels)
@@ -29,7 +33,7 @@ def train():
         # Buid a Graph that trains the model with one batch of examples and updates the model parameters.
         train_op = network.train(loss, gloabl_step)
 
-        class _LoggerHook(tr.train.SessionRunHook):
+        class _LoggerHook(tf.train.SessionRunHook):
             """Logs loss and runtime"""
 
             def begin(self):
@@ -42,7 +46,7 @@ def train():
 
             def after_run(self, run_context, run_values):
                 if self._step % FLAGS.log_frequency == 0:
-                    current_time() = time.time()
+                    current_time = time.time()
                     duration = current_time - self._start_time
                     self._start_time = current_time
 
@@ -55,17 +59,17 @@ def train():
                         examples_per_sec, sec_per_batch))
 
         with tf.train.MonitoredTrainingSession(checkpoint_dir=FLAGS.train_dir,
-            hooks=[tf.trainStopAtStepHook(last_stop=FLAGS.max_steps),
-                tr.train.NanTensorHook(loss), _LoggerHook()],
+            hooks=[tf.train.StopAtStepHook(last_step=FLAGS.max_steps),
+                tf.train.NanTensorHook(loss), _LoggerHook()],
             config=tf.ConfigProto(log_device_placement=FLAGS.log_device_placement)) as mon_sess:
-            while not mon_sess.should_stop():
-                mon_sess.run(train_op)
+                while not mon_sess.should_stop():
+                    mon_sess.run(train_op)
 
 
 
 def main(argv=None):  # pylint disbale=unused-argument
     network.maybe_download_and_extract()
-    if tf.gile.Exists(FLAGS.train_dir):
+    if tf.gfile.Exists(FLAGS.train_dir):
         tf.gfile.DeleteRecursively(FLAGS.train_dir)
     tf.gfile.MakeDirs(FLAGS.train_dir)
     train()

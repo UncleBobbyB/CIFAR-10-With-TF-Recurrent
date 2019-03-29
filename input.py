@@ -24,7 +24,7 @@ def read_cifar10(filename_queue):
             uint8image: a [height, width, depth] uint8 Tensor with the image data.
     """
 
-    class CIFAR10Record(obejct):
+    class CIFAR10Record(object):
         pass
 
     result = CIFAR10Record()
@@ -45,7 +45,7 @@ def read_cifar10(filename_queue):
     result.label = tf.cast(tf.strided_slice(record_bytes, [0], [label_bytes]), tf.int32)
 
     depth_major = tf.reshape(tf.strided_slice(record_bytes, [label_bytes], [label_bytes + image_bytes]), [result.depth, result.height, result.width])
-    result.uint8image = tf.trainspose(depth_major, [1, 2, 0])
+    result.uint8image = tf.transpose(depth_major, [1, 2, 0])
 
     return result
 
@@ -67,11 +67,14 @@ def _generate_image_and_label_batch(image, label, min_queue_examples, batch_size
     """
     num_preprocess_threads = 16
     if shuffle:
-    images, label_batch = tf.train.shuffle_batch([image, label], batch_size=batch_size, num_threads=num_preprocess_threads, capacity=min_queue_examples + 3 * batch_size, min_after_dequeue=min_queue_examples)
+        images, label_batch = tf.train.shuffle_batch([image, label], batch_size=batch_size, num_threads=num_preprocess_threads, capacity=min_queue_examples + 3 * batch_size, min_after_dequeue=min_queue_examples)
     else:
-    images, label_batch = tf.train.batch([image, label], batch_size=batch_size, num_threads=num_preprocess_threads, capacity=min_queue_examples + 3 * batch_size)
+        images, label_batch = tf.train.batch([image, label], batch_size=batch_size, num_threads=num_preprocess_threads, capacity=min_queue_examples + 3 * batch_size)
 
+    # Displa the training images in the visualizer.
     tf.summary.image('images', images)
+
+    return images, tf.reshape(label_batch, [batch_size])
 
     
 def distorted_inputs(data_dir, batch_size):
@@ -86,13 +89,15 @@ def distorted_inputs(data_dir, batch_size):
         images: Images, 4-D tensor of [batch_size, IMAGE_SIZE, IMAGE_SIZE, 3] size.
         labels: Labels, 1-D tensor of [batch_size] size.
     """
-    file_names = [os.path.join(data_dir, 'data_batch_%d.bin' % i) for i in range(1, 6)]
+    if data_dir[0:2] == './':
+        data_dir = data_dir[2:]
+    filenames = [os.path.join(data_dir, 'data_batch_%d.bin' % i) for i in range(1, 6)]
 
     for f in filenames:
         if not tf.gfile.Exists(f):
             raise ValueError('Failed to find file: ' + f)
 
-    filename_queue = tf.train.string_input_prodecer(filenames)
+    filename_queue = tf.train.string_input_producer(filenames)
     
     with tf.name_scope('data_augmentation'):
         # Read examples from files in the filename queue.
@@ -114,7 +119,7 @@ def distorted_inputs(data_dir, batch_size):
         distorted_image = tf.image.random_brightness(distorted_image, max_delta=63)
     
         # For contrast
-        distorted_image = tf.image.random_constrast(distorted_image, lower=0.2, upper=1.8)
+        distorted_image = tf.image.random_contrast(distorted_image, lower=0.2, upper=1.8)
 
         # Suntracting off the mean and divide by the variance of pixels
         float_image = tf.image.per_image_standardization(distorted_image)
@@ -146,17 +151,19 @@ def inputs(eval_data, data_dir, batch_size):
         labels: Labels, 1-D tensor of [batch_size] size.
     """
     if not eval_data:
-        filenames = [os.path.join(data_dir, 'data_batch_%d.bin' % i) for i in range(1, 6])]
+        filenames = [os.path.join(data_dir, 'data_batch_%d.bin' % i) for i in range(1, 6)]
         num_examples_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
     else:
         filenames = [os.path.join(data_dir, 'test_batch.bin')]
         num_examples_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
 
+    # print('******************', filenames)
     for f in filenames:
         if not tf.gfile.Exists(f):
             raise ValueError('Failed to find file: ' + f)
 
-    with name_scope('input'):
+    with tf.name_scope('input'):
+        # print('***********************************************')
         # Create a queue that rpoduces the filenames to read.
         filenames_queue = tf.train.string_input_producer(filenames)
 
@@ -184,6 +191,7 @@ def inputs(eval_data, data_dir, batch_size):
 
         # Generating a batch of images and labels by building up a queue of examples.
 
+        # print('***********************************************')
         return _generate_image_and_label_batch(float_image, read_input.label, min_queue_examples, batch_size, shuffle=False)
 
 

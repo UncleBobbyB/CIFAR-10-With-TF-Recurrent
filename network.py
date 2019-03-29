@@ -18,8 +18,9 @@ import re
 import sys
 import tarfile
 from six.moves import urllib
+import numpy as np
 import tensorflow as tf
-import input.py
+import input
 
 
 FLAGS = tf.app.flags.FLAGS
@@ -27,16 +28,16 @@ FLAGS = tf.app.flags.FLAGS
 # Basic model parameters.
 tf.app.flags.DEFINE_integer('batch_size', 128,
                             """Number of images to process in a batch.""")
-tf.app.flags.DEFINE_string('data_dir', '/tmp/cifar10_data',
+tf.app.flags.DEFINE_string('data_dir', './cifar10_data',
                            """Path to the CIFAR-10 data directory.""")
 tf.app.flags.DEFINE_boolean('use_fp16', False,
                             """Train the model using fp16.""")
 
 # Global constants describing the CIFAR-10 data set.
-IMAGE_SIZE = cifar10_input.IMAGE_SIZE
-NUM_CLASSES = cifar10_input.NUM_CLASSES
-NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = cifar10_input.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
-NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = cifar10_input.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
+IMAGE_SIZE = input.IMAGE_SIZE
+NUM_CLASSES = input.NUM_CLASSES
+NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = input.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
+NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = input.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
 
 
 # Constants describing the training process.
@@ -126,12 +127,45 @@ def distorted_inputs():
     if not FLAGS.data_dir:
         raise ValueError('Please supply a data_dir')
     data_dir = os.path.join(FLAGS.data_dir, 'cifar-10-batches-bin')
-    images, labels = input.inputs(eval_data=eval_data, data_dir=data_dir, batch_size=FLAGS.batch_size)
+    if data_dir[0:2] == './':
+        data_dir = data_dir[2:]
+    # print('**************************', data_dir)
+    images, labels = input.distorted_inputs(data_dir=data_dir, batch_size=FLAGS.batch_size)
 
     if FLAGS.use_fp16:
         images = tf.cast(images, tf.float16)
         labels = tf.cast(labels, tf.float16)
 
+    return images, labels
+
+
+def inputs(eval_data):
+    """
+    Construct input for CIFAR evaluation using the Reader ops.
+
+    Parameters:
+        eval_data: bool, indicating if one should use the train or eval data set.
+
+    Returns:
+        images: Images. 4-D Tensor of [batch_size, IMAGE_SIZE, IMAGE_SIZE, 3] size.
+        labels: Labels. 1-D Tensor of [batch_size] size.
+
+    Raises:
+        ValueErroe: If no data_dir.
+    """
+    if not FLAGS.data_dir:
+        raise ValueError('Please supply a data_dir')
+    data_dir = FLAGS.data_dir
+    if data_dir[0:2] == './':
+        data_dir = data_dir[2:]
+    data_dir = os.path.join(data_dir, 'cifar-10-batches-bin')
+    # print('*********************', data_dir)
+    images, labels = input.inputs(eval_data=eval_data, data_dir=data_dir, batch_size=FLAGS.batch_size)
+
+    if FLAGS.use_fp16:
+        images = tf.cast(images, tf.float16)
+        labels = tf.cast(labels, tf.float16)
+        
     return images, labels
 
 
@@ -176,7 +210,7 @@ def inference(images):
     norm2 = tf.nn.lrn(conv2, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75, name='norm2')
 
     # pool2
-    pool2 = tf.nn.max_pool(norm, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='SAME', name='pool2')
+    pool2 = tf.nn.max_pool(norm2, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='SAME', name='pool2')
     
     # local3
     with tf.variable_scope('local3') as scope:
@@ -204,6 +238,9 @@ def inference(images):
 
         _activation_summary(softmax_linear)
 
+        # print(softmax_linear.get_shape())
+        # os.system('pause')
+
     return softmax_linear
 
 
@@ -220,9 +257,16 @@ def loss(logits, labels):
         Loss tensor of type float.
     """
     # Calculate the average cross entropy loss across the batch.
+
     labels = tf.cast(labels, tf.int64)
-    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels, logits=logits, name='cross_entropy_per_examples')
-    cross_entropy_mean tf.reudce_mean(cross_entropy, name='cross_entropy')
+    # !!!!!!!!!!!!!!API changed!!!!!!!!!!!!!!!!!
+    labels = tf.expand_dims(labels, 1)
+    dim = labels.get_shape().as_list()[0]
+    labels = tf.concat(tf.constant([[i] for i in range(dim)], dtype=tf.int64), tf.Session().run(labels), 1)
+    labels = tf.SparseTensor(indices=labels, values=np.ones(dim).tolist(), dense_shape=[dim, NUM_CLASSES])
+
+    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels, logits=logits, name='cross_entropy_per_example')
+    cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
     tf.add_to_collection('losses', cross_entropy_mean)
 
     # The total loss is defined as the cross entropy loss plus all of the weight decay terms (L2 loss).
@@ -271,21 +315,21 @@ def train(total_loss, global_step):
     """
     # Variables that affect learning rate.
     num_batches_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN / FLAGS.batch_size
-    decay_step = int(num_batches_per_epoch * NUM_EPOCHS_PER_DECAY)
+    decay_steps = int(num_batches_per_epoch * NUM_EPOCHS_PER_DECAY)
 
     # Decay the learning rate exponentially based on the number of steps.
     lr = tf.train.exponential_decay(INITIAL_LEARNING_RATE, global_step, decay_steps, LEARNING_RATE_DECAY_FACTOR, staircase=True)
     tf.summary.scalar('learning_rate', lr)
 
-    loss_average_op = _add_loss_summaries(total_loss)
+    loss_averages_op = _add_loss_summaries(total_loss)
 
     # Compute gradients.
-    with tf.control_dependencies([loss_averates_op]):
+    with tf.control_dependencies([loss_averages_op]):
         opt = tf.train.GradientDescentOptimizer(lr)
-        grads = opt.comute_gradients(total_loss)
+        grads = opt.compute_gradients(total_loss)
 
     # Apply gradients.
-    apply_gradient_op = opt.apply_gradients(grads, gloabl_step=global_step)
+    apply_gradient_op = opt.apply_gradients(grads, global_step=global_step)
 
     # Add histograms for trainable variables.
     for var in tf.trainable_variables():
@@ -297,7 +341,7 @@ def train(total_loss, global_step):
             tf.summary.histogram(var.op.name + '/gradients', grad)
 
     # Track the movign averages of all trainable variables.
-    variable+averages = tf.train.ExmponentialMovingAverage(MOVING_AVERAGE_DECAY, global_step)
+    variable_averages = tf.train.ExponentialMovingAverage(MOVING_AVERAGE_DECAY, global_step)
     with tf.control_dependencies([apply_gradient_op]):
         variable_averages_op = variable_averages.apply(tf.trainable_variables())
 
@@ -307,14 +351,17 @@ def train(total_loss, global_step):
 def maybe_download_and_extract():
     """Download  and extract the tarball from Alex's  website."""
     dest_directory = FLAGS.data_dir
-    if not os.path.exists(distorted_inputs):
+    if not os.path.exists(dest_directory):
         os.makedirs(dest_directory)
 
     filename = DATA_URL.split('/')[-1]
+    if dest_directory[0:2] == './':
+        dest_directory = dest_directory[2:]
     filepath = os.path.join(dest_directory, filename)
     if not os.path.exists(filepath):
+        print('Calling mayber_download_and_extract()')
         def _progress(count, block_size, total_size):
-            sys.stdout.write('\r>> Downloadign %s %.1f%%' % (filename,
+            sys.stdout.write('\r>> Downloading %s %.1f%%' % (filename,
                 float(count * block_size) / float(total_size) * 100.0))
             sys.stdout.flush()
         file_path, _ = urllib.request.urlretrieve(DATA_URL, filepath,
