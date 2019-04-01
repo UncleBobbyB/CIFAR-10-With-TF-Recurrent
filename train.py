@@ -31,8 +31,6 @@ def train():
         loss = network.loss(logits, labels)
 
         # Buid a Graph that trains the model with one batch of examples and updates the model parameters.
-        print('************hi')
-        exit()
         train_op = network.train(loss, gloabl_step)
 
 

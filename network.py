@@ -258,23 +258,38 @@ def loss(logits, labels):
     """
     # Calculate the average cross entropy loss across the batch.
 
+    """
+    no shitty use!!!
 
-    labels = tf.cast(labels, tf.int64)
     # !!!!!!!!!!!!!!API changed!!!!!!!!!!!!!!!!!
-    labels = tf.expand_dims(labels, 1)
-    dim = labels.get_shape().as_list()[0]
-    # temp_labels = tf.concat(tf.constant([[i] for i in range(dim)], dtype=tf.int64), tf.Session().run(labels), 1)
-    temp_labels = []
-    with tf.Session() as sess:
-        for i in range(dim):
-            temp_labels.append([i])
+    # dim = labels.get_shape().as_list()[0]
+    # # temp_labels = tf.concat(tf.constant([[i] for i in range(dim)], dtype=tf.int64), tf.Session().run(labels), 1)
+    # temp_labels = []
+    # with tf.Session() as sess:
+    #     coord = tf.train.Coordinator()
+    #     tf.train.start_queue_runners(sess, coord)
+    #     for i in range(dim):
+    #         temp_labels.append(([i]))
 
-        labels = tf.concat(tf.constant(temp_labels, dtype=tf.int64),
-                sess.run(labels), 1)
-    print(labels.get_shape())
-    print("*************hello")
-    exit()
-    labels = tf.SparseTensor(indices=temp_labels, values=np.ones(dim).tolist(), dense_shape=[dim, NUM_CLASSES])
+    #     labels = tf.concat([temp_labels,
+    #             sess.run(labels)], 1)
+
+    # labels = tf.cast(labels, tf.int64)
+
+    # labels = tf.SparseTensor(indices=labels, values=tf.constant(np.ones(dim, dtype=np.int64).tolist(), dtype=tf.int64), dense_shape=[dim, NUM_CLASSES])
+    # labels = tf.cast(labels, tf.float64)
+
+    """
+
+    # with tf.Session() as sess:
+    #     coord = tf.train.Coordinator()
+    #     tf.train.start_queue_runners(sess, coord)
+    #     labels = tf.one_hot(labels, NUM_CLASSES)
+
+    # with tf.Session() as sess:
+    #     coord = tf.train.Coordinator()
+    #     tf.train.start_queue_runners(sess, coord)
+    #     print(sess.run(labels))
 
     cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels, logits=logits, name='cross_entropy_per_example')
     cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
