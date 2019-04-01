@@ -13,7 +13,7 @@ def read_cifar10(filename_queue):
 
     Parammeters:
         filename_queue: A queue of strings with the filenames to read from.
-    
+
     Returns:
         An object representating a single example, with the following fields:
             height: number of rows in the result (32)
@@ -98,7 +98,7 @@ def distorted_inputs(data_dir, batch_size):
             raise ValueError('Failed to find file: ' + f)
 
     filename_queue = tf.train.string_input_producer(filenames)
-    
+
     with tf.name_scope('data_augmentation'):
         # Read examples from files in the filename queue.
         read_input = read_cifar10(filename_queue)
@@ -117,7 +117,7 @@ def distorted_inputs(data_dir, batch_size):
 
         # Adjusting brightness
         distorted_image = tf.image.random_brightness(distorted_image, max_delta=63)
-    
+
         # For contrast
         distorted_image = tf.image.random_contrast(distorted_image, lower=0.2, upper=1.8)
 
@@ -133,6 +133,7 @@ def distorted_inputs(data_dir, batch_size):
         min_queue_examples = int(NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN * min_fraction_of_examples_in_queue)
 
         print('Filling queue with %d CIFAR images before starting to train.' % min_queue_examples)
+
 
     # Generate a batch of images and labels by building up a queue of examples
     return _generate_image_and_label_batch(float_image, read_input.label, min_queue_examples, batch_size, shuffle=True)
