@@ -40,11 +40,9 @@ def train():
             def begin(self):
                 self._step = -1
                 self._start_time = time.time()
-                print('begin')
 
             def before_run(self, run_context):
                 self._step += 1
-                print('before_run')
                 return tf.train.SessionRunArgs(loss) # Asks for loss value
 
             def after_run(self, run_context, run_values):

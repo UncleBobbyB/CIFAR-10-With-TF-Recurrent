@@ -48,7 +48,7 @@ def read_cifar10(filename_queue):
     #     print('**********************')
     #     coord = tf.train.Coordinator()
     #     tf.train.start_queue_runners(sess, coord)
-    #     print(sess.run(record_bytes))
+    #     print(sess.run(result.label))
     # exit()
 
     depth_major = tf.reshape(tf.strided_slice(record_bytes, [label_bytes], [label_bytes + image_bytes]), [result.depth, result.height, result.width])
@@ -99,6 +99,8 @@ def distorted_inputs(data_dir, batch_size):
     if data_dir[0:2] == './':
         data_dir = data_dir[2:]
     filenames = [os.path.join(data_dir, 'data_batch_%d.bin' % i) for i in range(1, 6)]
+    # for i in range(len(filenames)):
+    #     filenames[i] = filenames[i].replace('\\', '/')
 
     for f in filenames:
         if not tf.gfile.Exists(f):
